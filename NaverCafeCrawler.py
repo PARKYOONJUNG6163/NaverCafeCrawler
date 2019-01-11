@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[26]:
+# In[1]:
 
 
 from selenium import webdriver
@@ -13,11 +13,11 @@ import datetime
 import pymysql
 
 
-# In[27]:
+# In[2]:
 
 
 def save_DB() : 
-    conn = pymysql.connect(host = "", user = "root", password = "", charset = "utf8")
+    conn = pymysql.connect(host = "147.43.122.34", user = "root", password = "1234", charset = "utf8")
     curs = conn.cursor()
     
     curs.execute("use naver_cafe ;")
@@ -53,7 +53,7 @@ def save_DB() :
     print("FINISH")
 
 
-# In[28]:
+# In[3]:
 
 
 keyword = input("Keyword ? ")
@@ -70,15 +70,20 @@ start_date = start_year+start_month+start_day
 end_date = end_year+end_month+end_day
 
 
-# In[29]:
+# In[4]:
 
 
 options = webdriver.ChromeOptions()
 options.add_argument('headless')
+
 dt_start_date = datetime.datetime.strptime(start_date,"%Y%m%d").date()
 dt_end_date = datetime.datetime.strptime(end_date,"%Y%m%d").date()
 day_1 = datetime.timedelta(days=1)
 dt_start_1 = dt_start_date
+
+
+# In[5]:
+
 
 # 일수를 하루씩 잘라서 반복
 while dt_start_1 <= dt_end_date :
@@ -101,7 +106,8 @@ while dt_start_1 <= dt_end_date :
         for a,d in zip(a_tags,dd_tags) :
             if 'href' in a.attrs :
                 url = a.attrs['href']
-                driver = webdriver.Chrome('C:/Users/User/Jupyter/chromedriver/chromedriver',chrome_options=options)
+                print(url)
+                driver = webdriver.Chrome('./chromedriver/chromedriver',chrome_options=options)
                 driver.implicitly_wait(3)
                 driver.get(url)
                  # 페이지 변환      
@@ -109,8 +115,8 @@ while dt_start_1 <= dt_end_date :
                 driver.switch_to_frame(frame)
 
                 soup = BeautifulSoup(driver.page_source,'html.parser')
-                
-                if soup.find("td", {"class" : "reply"}) is not None :
+                # 전체공개 버튼 없다면
+                if soup.find("img", {"class" : "recomm"}) is not None :
                     cafe_title = soup.find("span", {"class" : "b m-tcol-c"}).text
                     cafe_date = d.text
                     cafe_writer = soup.find("a", {"class" : "m-tcol-c b"}).text
@@ -119,11 +125,16 @@ while dt_start_1 <= dt_end_date :
                         cafe_like = driver.find_elements_by_xpath("//em[@class='u_cnt _count']")[0].text
                     else :
                         cafe_like = 0
-                    reply_count = driver.find_element_by_xpath("//a[@class='reply_btn b m-tcol-c m-tcol-p _totalCnt']").text[3:4]
+                    # 댓글 창이 없으면 0으로 
+                    if soup.find("a", {"class" : "reply_btn b m-tcol-c m-tcol-p _totalCnt"}) is not None :
+                        reply_count = soup.find("a", {"class" : "reply_btn b m-tcol-c m-tcol-p _totalCnt"}).text.strip()[3:]
+                    else :
+                        reply_count = 0
+                        
                     cafe_content = soup.find("div", {"class" : "tbody m-tcol-c"}).text.replace('\n','').strip()
                     
                     total_list.append([url,cafe_title,cafe_date,cafe_writer,cafe_like,reply_count,cafe_content])
-
+        print(total_list)
         driver.get(p_url)
         page_num += 1
         # 다음 페이지 버튼 있나 확인 후 없으면 while문 빠져나감
@@ -140,7 +151,7 @@ while dt_start_1 <= dt_end_date :
     save_DB()
 
 
-# In[33]:
+# In[8]:
 
 
 # DB 생성시 이용
@@ -148,7 +159,7 @@ while dt_start_1 <= dt_end_date :
 # curs.execute(query)
 
 
-# In[32]:
+# In[7]:
 
 
 #DB삭제시 이용
@@ -156,11 +167,11 @@ while dt_start_1 <= dt_end_date :
 # curs.execute(query)
 
 
-# In[31]:
+# In[ ]:
 
 
 #DB내용 확인시 이용
-# conn = pymysql.connect(host = "", user = "root", password = "", charset = "utf8")
+# conn = pymysql.connect(host = "147.43.122.34", user = "root", password = "1234", charset = "utf8")
 # curs = conn.cursor()
 # curs.execute("use naver_cafe ;")
 # query = """select * from 원자력; """
