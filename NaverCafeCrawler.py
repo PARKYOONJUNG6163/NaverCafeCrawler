@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[7]:
 
 
 from selenium import webdriver
@@ -13,24 +13,42 @@ import datetime
 import pymysql
 
 
-# In[2]:
+# In[8]:
+
+
+def createDB(conn,dbname):
+    curs = conn.cursor()
+    query = """CREATE DATABASE """+dbname
+    try :
+        curs.execute(query)
+    except :
+        print('DB가 이미 존재합니다. DB_NAME : ',dbname)
+    
+    query = """ALTER DATABASE """+ dbname + """ CHARACTER SET utf8 COLLATE utf8_general_ci;"""
+    curs.execute(query)
+    conn.commit()
+
+
+# In[9]:
 
 
 def save_DB() : 
+    temp = keyword.replace(' ','_')
     conn = pymysql.connect(host = "", user = "root", password = "", charset = "utf8")
+    dbname = 'naver_cafe_'+ temp
+    createDB(conn,dbname)
     curs = conn.cursor()
-    
-    curs.execute("use naver_cafe ;")
+    curs.execute("""use """+dbname)
 
-    query = """CREATE TABLE IF NOT EXISTS """+ keyword+ """(ID int, URL varchar(100), Title varchar(100), Date varchar(20), Writer varchar(50), cafe_like int, Count int,Text text(62200));"""
+    query = """CREATE TABLE IF NOT EXISTS """+ temp + """(ID int, URL varchar(100), Title varchar(100), Date varchar(20), Writer varchar(50), cafe_like int, Count int,Text text(62200));"""
     curs.execute(query)
 
-    query = """ALTER TABLE """ + keyword +""" CHARACTER SET utf8 COLLATE utf8_general_ci;"""
+    query = """ALTER TABLE """ + temp +""" CHARACTER SET utf8 COLLATE utf8_general_ci;"""
     curs.execute(query)
 
     conn.commit()
     
-    select_query = """SELECT * from """ + keyword 
+    select_query = """SELECT * from """ + temp
     index = curs.execute(select_query)
 
     for value in total_list :
@@ -42,7 +60,7 @@ def save_DB() :
         count = value[5]
         content = value[6]
 
-        query = """insert into """ + keyword + """(ID, URL, Title, Date, Writer, cafe_like, Count, Text) values (%s, %s, %s, %s, %s, %s, %s, %s) ; """
+        query = """insert into """ + temp + """(ID, URL, Title, Date, Writer, cafe_like, Count, Text) values (%s, %s, %s, %s, %s, %s, %s, %s) ; """
         curs.execute(query, (str(index), url, title, date,writer,like,count,content))
 
         index = index + 1 
@@ -53,7 +71,7 @@ def save_DB() :
     print("FINISH")
 
 
-# In[3]:
+# In[17]:
 
 
 keyword = input("Keyword ? ")
@@ -70,11 +88,8 @@ start_date = start_year+start_month+start_day
 end_date = end_year+end_month+end_day
 
 
-# In[4]:
+# In[18]:
 
-
-options = webdriver.ChromeOptions()
-options.add_argument('headless')
 
 dt_start_date = datetime.datetime.strptime(start_date,"%Y%m%d").date()
 dt_end_date = datetime.datetime.strptime(end_date,"%Y%m%d").date()
@@ -82,7 +97,7 @@ day_1 = datetime.timedelta(days=1)
 dt_start_1 = dt_start_date
 
 
-# In[5]:
+# In[19]:
 
 
 # 일수를 하루씩 잘라서 반복
@@ -94,20 +109,18 @@ while dt_start_1 <= dt_end_date :
     # 페이지 만큼 돌면서 링크 수집
     while True : 
         p_url = 'https://search.naver.com/search.naver?where=article&query='+keyword+'&ie=utf8&st=rel&date_option=6&date_from='+start_date+'&date_to='+start_date+'&board=&srchby=text&dup_remove=1&sm=tab_opt&t=0&mson=0&prdtype=0&start='+str(page_num)+'1'
-        driver = webdriver.Chrome('./chromedriver/chromedriver',chrome_options=options)
+        driver = webdriver.Chrome('./chromedriver/chromedriver')
         driver.implicitly_wait(3)
         driver.get(p_url)
         soup = BeautifulSoup(driver.page_source,'html.parser')
-
-        dd_tags = driver.find_elements_by_class_name('txt_inline')
         a_tags = soup.select('ul#elThumbnailResultArea li dl dt a')
 
         # 한 페이지에 있는 링크들 전부 가져오기
-        for a,d in zip(a_tags,dd_tags) :
+        for a in a_tags :
             if 'href' in a.attrs :
                 url = a.attrs['href']
                 print(url)
-                driver = webdriver.Chrome('./chromedriver/chromedriver',chrome_options=options)
+                driver = webdriver.Chrome('./chromedriver/chromedriver')
                 driver.implicitly_wait(3)
                 driver.get(url)
                  # 페이지 변환      
@@ -117,29 +130,34 @@ while dt_start_1 <= dt_end_date :
                 soup = BeautifulSoup(driver.page_source,'html.parser')
                 # 전체공개 버튼 없다면
                 if soup.find("img", {"class" : "recomm"}) is not None :
-                    cafe_title = soup.find("span", {"class" : "b m-tcol-c"}).text
-                    cafe_date = d.text
-                    cafe_writer = soup.find("a", {"class" : "m-tcol-c b"}).text
+                    cafe_title = soup.find("span", {"class" : "b m-tcol-c"}).get_text().strip().encode('cp949','ignore')
+                    cafe_title = cafe_title.decode('cp949','ignore')
+                    print(cafe_title)
+                    cafe_date = soup.find("td", {"class" : "m-tcol-c date"}).get_text()
+                    print(cafe_date)
+                    cafe_writer = soup.find("a", {"class" : "m-tcol-c b"}).get_text()
+                    print(cafe_writer)
                     # 좋아요 없으면 0으로
                     if soup.find("em", {"class" : "u_cnt _count"}) is not None :
-                        cafe_like = driver.find_elements_by_xpath("//em[@class='u_cnt _count']")[0].text
+                        cafe_like = soup.find("em", {"class" : "u_cnt _count"}).get_text()
                     else :
                         cafe_like = 0
+                    print(cafe_like)
                     # 댓글 창이 없으면 0으로 
                     if soup.find("a", {"class" : "reply_btn b m-tcol-c m-tcol-p _totalCnt"}) is not None :
-                        reply_count = soup.find("a", {"class" : "reply_btn b m-tcol-c m-tcol-p _totalCnt"}).text.strip()[3:]
+                        reply_count = soup.find("a", {"class" : "reply_btn b m-tcol-c m-tcol-p _totalCnt"}).get_text().strip()[3:]
                     else :
                         reply_count = 0
-                        
-                    cafe_content = soup.find("div", {"class" : "tbody m-tcol-c"}).text.replace('\n','').strip()
-                    
+                    print(reply_count)
+                    cafe_content = soup.find("div", {"class" : "tbody m-tcol-c"}).get_text().replace('\n','').strip().encode('cp949','ignore')
+                    cafe_content = cafe_content.decode('cp949','ignore')
+                    print(cafe_content)
                     total_list.append([url,cafe_title,cafe_date,cafe_writer,cafe_like,reply_count,cafe_content])
-        print(total_list)
         driver.get(p_url)
-        page_num += 1
         # 다음 페이지 버튼 있나 확인 후 없으면 while문 빠져나감
         try :
             driver.find_element_by_xpath("//a[@class='next']").click()
+            page_num += 1
         except : 
             break;
             
@@ -151,18 +169,12 @@ while dt_start_1 <= dt_end_date :
     save_DB()
 
 
-# In[8]:
-
-
-# DB 생성시 이용
-# query = """CREATE DATABASE naver_cafe default CHARACTER SET UTF8;"""
-# curs.execute(query)
-
-
-# In[7]:
+# In[ ]:
 
 
 #DB삭제시 이용
+# conn = pymysql.connect(host = "", user = "root", password = "", charset = "utf8")
+# curs = conn.cursor()
 # query = """DROP DATABASE naver_cafe; """
 # curs.execute(query)
 
